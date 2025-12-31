@@ -2,6 +2,7 @@ using Photon.Pun;
 using Photon.Realtime;
 using UnityEngine;
 using TMPro;
+using ExitGames.Client.Photon;
 
 public class PhotonLauncher : MonoBehaviourPunCallbacks
 {
@@ -15,6 +16,11 @@ public class PhotonLauncher : MonoBehaviourPunCallbacks
     public TextMeshProUGUI statusText;
     public TextMeshProUGUI roomIdText;
     public TMP_InputField roomIdInput;
+
+    [Header("Game Mode")]
+    // Selected mode applied when creating a room. Default: 3x3, win=3
+    public int selectedGridSize = 3;
+    public int selectedWinLength = 3;
 
     bool canInteract = false;
 
@@ -52,6 +58,28 @@ public class PhotonLauncher : MonoBehaviourPunCallbacks
         statusText.text = "Connected ✔";
     }
 
+    // Mode selection buttons (wire these to UI buttons)
+    public void OnMode3Click()
+    {
+        selectedGridSize = 3;
+        selectedWinLength = 3;
+        if (statusText != null) statusText.text = "Mode: 3x3 (3 in a row)";
+    }
+
+    public void OnMode4Click()
+    {
+        selectedGridSize = 6;
+        selectedWinLength = 4;
+        if (statusText != null) statusText.text = "Mode: 4x4 (6 in a row)";
+    }
+
+    public void OnMode5Click()
+    {
+        selectedGridSize = 9;
+        selectedWinLength = 5;
+        if (statusText != null) statusText.text = "Mode: 5x5 (9 in a row)";
+    }
+
     // ================= BUTTONS =================
 
     // AUTO MATCH
@@ -60,7 +88,14 @@ public class PhotonLauncher : MonoBehaviourPunCallbacks
         if (!canInteract) return;
 
         statusText.text = "Finding opponent...";
-        PhotonNetwork.JoinRandomRoom();
+        // Join a random room that matches the selected mode (gridSize/winLength)
+        var expected = new Hashtable
+        {
+            { "gridSize", selectedGridSize },
+            { "winLength", selectedWinLength }
+        };
+        // expected max players byte set to 2 (match only rooms with space for 2)
+        PhotonNetwork.JoinRandomRoom(expected, (byte)2);
     }
 
     // CREATE ROOM (DEBUG)
@@ -77,9 +112,17 @@ public class PhotonLauncher : MonoBehaviourPunCallbacks
             IsOpen = true
         };
 
+        // Attach selected mode to room custom properties so joins use the same board
+        var props = new Hashtable
+        {
+            { "gridSize", selectedGridSize },
+            { "winLength", selectedWinLength }
+        };
+        options.CustomRoomProperties = props;
+        options.CustomRoomPropertiesForLobby = new string[] { "gridSize", "winLength" };
+
         statusText.text = "Creating room...";
         PhotonNetwork.CreateRoom(roomId, options);
-    // Wait for OnCreatedRoom / OnJoinedRoom to confirm and update the UI
     }
 
     // JOIN ROOM BY ID
@@ -108,18 +151,25 @@ public class PhotonLauncher : MonoBehaviourPunCallbacks
             IsOpen = true
         };
 
+        // use currently selected mode for auto-created room
+        var props = new Hashtable
+        {
+            { "gridSize", selectedGridSize },
+            { "winLength", selectedWinLength }
+        };
+        options.CustomRoomProperties = props;
+        options.CustomRoomPropertiesForLobby = new string[] { "gridSize", "winLength" };
+
         PhotonNetwork.CreateRoom(roomId, options);
     }
 
-    // Called when the local client successfully created a room (but not necessarily joined?)
+    // Called when the local client successfully created a room
     public override void OnCreatedRoom()
     {
         Debug.Log("OnCreatedRoom: Room created: " + PhotonNetwork.CurrentRoom.Name);
         if (statusText != null)
             statusText.text = "Created room: " + PhotonNetwork.CurrentRoom.Name;
-        // Optionally update room id UI here (safer to do on join)
-        if (roomIdText != null && PhotonNetwork.CurrentRoom != null)
-            roomIdText.text = "Room ID: " + PhotonNetwork.CurrentRoom.Name;
+        // roomIdText is updated on join to ensure server accepted
     }
 
     public override void OnCreateRoomFailed(short returnCode, string message)
@@ -133,6 +183,29 @@ public class PhotonLauncher : MonoBehaviourPunCallbacks
     {
         roomIdText.text = "Room ID: " + PhotonNetwork.CurrentRoom.Name;
         statusText.text = "Joined room (" + PhotonNetwork.CurrentRoom.PlayerCount + "/2)";
+
+        // Read room custom properties for mode and configure game manager accordingly
+        if (PhotonNetwork.CurrentRoom != null && PhotonNetwork.CurrentRoom.CustomProperties != null)
+        {
+            var rprops = PhotonNetwork.CurrentRoom.CustomProperties;
+            int gSize = selectedGridSize;
+            int wLen = selectedWinLength;
+            if (rprops.ContainsKey("gridSize"))
+            {
+                try { gSize = System.Convert.ToInt32(rprops["gridSize"]); } catch { }
+            }
+            if (rprops.ContainsKey("winLength"))
+            {
+                try { wLen = System.Convert.ToInt32(rprops["winLength"]); } catch { }
+            }
+
+            // Apply to XOGameManager (ensure instance exists)
+            if (XOGameManager.Instance != null)
+            {
+                XOGameManager.Instance.ConfigureMode(gSize, wLen);
+            }
+        }
+
         TryStartGame();
     }
 
@@ -151,13 +224,16 @@ public class PhotonLauncher : MonoBehaviourPunCallbacks
 
     void TryStartGame()
     {
-        if (PhotonNetwork.CurrentRoom.PlayerCount == 2)
+        bool forceStartLocal = XOGameManager.Instance != null && XOGameManager.Instance.localMode;
+        if ((PhotonNetwork.CurrentRoom != null && PhotonNetwork.CurrentRoom.PlayerCount == 2) || forceStartLocal)
         {
             lobbyPanel.SetActive(false);
             gamePanel.SetActive(true);
-
-            statusText.text = "Game Started!";
-            XOGameManager.Instance.StartGame();
+            statusText.text = forceStartLocal ? "Local Game Started!" : "Game Started!";
+            if (XOGameManager.Instance != null)
+                XOGameManager.Instance.StartGame();
+            else
+                Debug.LogWarning("XOGameManager.Instance is null when trying to start game.");
         }
     }
 }
