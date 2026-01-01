@@ -2865,6 +2865,7 @@ GameObject:
   - component: {fileID: 1717233416}
   - component: {fileID: 1717233418}
   - component: {fileID: 1717233417}
+  - component: {fileID: 1717233419}
   m_Layer: 5
   m_Name: Panel
   m_TagString: Untagged
@@ -2933,6 +2934,20 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1717233415}
   m_CullTransparentMesh: 1
+--- !u!114 &1717233419
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1717233415}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6b085300f53d7bb4285dd9f26759064b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  statusText: {fileID: 1358260031}
+  rematchButton: {fileID: 792140551}
 --- !u!1 &1743421995
 GameObject:
   m_ObjectHideFlags: 0
@@ -3721,14 +3736,16 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7730c9f69fd316340bca6b78dc2be696, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  gridSize: 3
+  winLength: 3
+  localMode: 1
   cellPrefab: {fileID: 3577671026148909302, guid: b70705e87065aa4448d4b7c510afb99f, type: 3}
   gridParent: {fileID: 427386750}
   cells: []
-  statusText: {fileID: 1358260031}
-  rematchButton: {fileID: 792140551}
-  gridSize: 3
-  winLength: 4
-  localMode: 1
+  ui: {fileID: 1717233419}
+  winLinePrefab: {fileID: 6299034079753431419, guid: 909e270f8053117489a7be0a4e6b9bbc, type: 3}
+  winLineThickness: 8
+  winLineContainer: {fileID: 1717233416}
 --- !u!4 &2074083949
 Transform:
   m_ObjectHideFlags: 0
