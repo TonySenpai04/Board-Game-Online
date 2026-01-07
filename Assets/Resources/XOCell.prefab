@@ -89,7 +89,7 @@ GameObject:
   - component: {fileID: 3665591602578725953}
   - component: {fileID: 3127049947219863330}
   m_Layer: 5
-  m_Name: Image
+  m_Name: XOCell
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0

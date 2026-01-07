@@ -34,8 +34,7 @@ public class PhotonLauncher : MonoBehaviourPunCallbacks
 
     void Start()
     {
-        lobbyPanel.SetActive(true);
-        gamePanel.SetActive(false);
+        
 
         statusText.text = "Connecting to Photon...";
         PhotonNetwork.AutomaticallySyncScene = false;
