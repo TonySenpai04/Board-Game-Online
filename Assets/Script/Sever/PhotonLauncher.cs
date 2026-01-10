@@ -8,21 +8,76 @@ public class PhotonLauncher : MonoBehaviourPunCallbacks
 {
     public static PhotonLauncher Instance;
 
-    [Header("Panels")]
+    [Header("Panels XO")]
     public GameObject lobbyPanel;
     public GameObject gamePanel;
 
-    [Header("UI")]
+    [Header("UI XO")]
     public TextMeshProUGUI statusText;
     public TextMeshProUGUI roomIdText;
     public TMP_InputField roomIdInput;
+     [Header("Panels Chess")]
+    public GameObject lobbyPanelChess;
+    public GameObject gamePanelChess;
+
+    [Header("UI Chess")]
+    public TextMeshProUGUI statusTextChess;
+    public TextMeshProUGUI roomIdTextChess;
+    public TMP_InputField roomIdInputChess;
+
+
+    // Supported game modes
+    public enum GameMode { XO, Chess }
 
     [Header("Game Mode")]
-    // Selected mode applied when creating a room. Default: 3x3, win=3
+    // Selected game mode (default XO)
+    public GameMode selectedGameMode = GameMode.XO;
+
+    // Selected XO grid settings applied when creating a room. Default: 3x3, win=3
     public int selectedGridSize = 3;
     public int selectedWinLength = 3;
 
     bool canInteract = false;
+
+    // Helpers to route UI between XO and Chess
+    void SetStatus(string s)
+    {
+        if (selectedGameMode == GameMode.Chess)
+        {
+            if (statusTextChess != null) statusTextChess.text = s;
+        }
+        else
+        {
+            if (statusText != null) statusText.text = s;
+        }
+    }
+
+    void SetRoomIdText(string s)
+    {
+        if (selectedGameMode == GameMode.Chess)
+        {
+            if (roomIdTextChess != null) roomIdTextChess.text = s;
+        }
+        else
+        {
+            if (roomIdText != null) roomIdText.text = s;
+        }
+    }
+
+    TMP_InputField GetRoomIdInput()
+    {
+        return selectedGameMode == GameMode.Chess ? roomIdInputChess : roomIdInput;
+    }
+
+    GameObject GetLobbyPanel()
+    {
+        return selectedGameMode == GameMode.Chess ? lobbyPanelChess : lobbyPanel;
+    }
+
+    GameObject GetGamePanel()
+    {
+        return selectedGameMode == GameMode.Chess ? gamePanelChess : gamePanel;
+    }
 
     void Awake()
     {
@@ -36,7 +91,7 @@ public class PhotonLauncher : MonoBehaviourPunCallbacks
     {
         
 
-        statusText.text = "Connecting to Photon...";
+    SetStatus("Connecting to Photon...");
         PhotonNetwork.AutomaticallySyncScene = false;
         PhotonNetwork.LogLevel = PunLogLevel.Full;
 
@@ -47,14 +102,14 @@ public class PhotonLauncher : MonoBehaviourPunCallbacks
 
     public override void OnConnectedToMaster()
     {
-        statusText.text = "Connected to Master. Joining Lobby...";
+        SetStatus("Connected to Master. Joining Lobby...");
         PhotonNetwork.JoinLobby();
     }
 
     public override void OnJoinedLobby()
     {
         canInteract = true;
-        statusText.text = "Connected ✔";
+        SetStatus("Connected ✔");
     }
 
     // Mode selection buttons (wire these to UI buttons)
@@ -62,21 +117,33 @@ public class PhotonLauncher : MonoBehaviourPunCallbacks
     {
         selectedGridSize = 3;
         selectedWinLength = 3;
-        if (statusText != null) statusText.text = "Mode: 3x3 (3 in a row)";
+        SetStatus("Mode: 3x3 (3 in a row)");
     }
 
     public void OnMode4Click()
     {
         selectedGridSize = 6;
         selectedWinLength = 4;
-        if (statusText != null) statusText.text = "Mode: 4x4 (6 in a row)";
+        SetStatus("Mode: 6x6 (4 in a row)");
+    }
+
+    // Single button handler to select the top-level game mode.
+    // Use Button.OnClick with an Int parameter: 0 => XO, 1 => Chess
+    public void OnSelectGameMode(int modeIndex)
+    {
+        if (modeIndex == 0)
+            selectedGameMode = GameMode.XO;
+        else if (modeIndex == 1)
+            selectedGameMode = GameMode.Chess;
+
+    SetStatus("Selected game: " + selectedGameMode.ToString());
     }
 
     public void OnMode5Click()
     {
         selectedGridSize = 9;
         selectedWinLength = 5;
-        if (statusText != null) statusText.text = "Mode: 5x5 (9 in a row)";
+        SetStatus("Mode: 9x9 (5 in a row)");
     }
 
     // ================= BUTTONS =================
@@ -86,13 +153,15 @@ public class PhotonLauncher : MonoBehaviourPunCallbacks
     {
         if (!canInteract) return;
 
-        statusText.text = "Finding opponent...";
-        // Join a random room that matches the selected mode (gridSize/winLength)
-        var expected = new Hashtable
+        SetStatus("Finding opponent...");
+        // Join a random room that matches the selected mode (filter by gameMode and XO params)
+        var expected = new Hashtable();
+        expected["gameMode"] = selectedGameMode.ToString();
+        if (selectedGameMode == GameMode.XO)
         {
-            { "gridSize", selectedGridSize },
-            { "winLength", selectedWinLength }
-        };
+            expected["gridSize"] = selectedGridSize;
+            expected["winLength"] = selectedWinLength;
+        }
         // expected max players byte set to 2 (match only rooms with space for 2)
         PhotonNetwork.JoinRandomRoom(expected, (byte)2);
     }
@@ -114,13 +183,20 @@ public class PhotonLauncher : MonoBehaviourPunCallbacks
         // Attach selected mode to room custom properties so joins use the same board
         var props = new Hashtable
         {
-            { "gridSize", selectedGridSize },
-            { "winLength", selectedWinLength }
+            { "gameMode", selectedGameMode.ToString() }
         };
+        if (selectedGameMode == GameMode.XO)
+        {
+            props["gridSize"] = selectedGridSize;
+            props["winLength"] = selectedWinLength;
+        }
         options.CustomRoomProperties = props;
-        options.CustomRoomPropertiesForLobby = new string[] { "gridSize", "winLength" };
+        if (selectedGameMode == GameMode.XO)
+            options.CustomRoomPropertiesForLobby = new string[] { "gameMode", "gridSize", "winLength" };
+        else
+            options.CustomRoomPropertiesForLobby = new string[] { "gameMode" };
 
-        statusText.text = "Creating room...";
+        SetStatus("Creating room...");
         PhotonNetwork.CreateRoom(roomId, options);
     }
 
@@ -129,10 +205,9 @@ public class PhotonLauncher : MonoBehaviourPunCallbacks
     {
         if (!canInteract) return;
 
-        string roomId = roomIdInput.text.Trim();
+        string roomId = GetRoomIdInput().text.Trim();
         if (string.IsNullOrEmpty(roomId)) return;
-
-        statusText.text = "Joining room " + roomId + "...";
+        SetStatus("Joining room " + roomId + "...");
         PhotonNetwork.JoinRoom(roomId);
     }
 
@@ -153,11 +228,18 @@ public class PhotonLauncher : MonoBehaviourPunCallbacks
         // use currently selected mode for auto-created room
         var props = new Hashtable
         {
-            { "gridSize", selectedGridSize },
-            { "winLength", selectedWinLength }
+            { "gameMode", selectedGameMode.ToString() }
         };
+        if (selectedGameMode == GameMode.XO)
+        {
+            props["gridSize"] = selectedGridSize;
+            props["winLength"] = selectedWinLength;
+        }
         options.CustomRoomProperties = props;
-        options.CustomRoomPropertiesForLobby = new string[] { "gridSize", "winLength" };
+        if (selectedGameMode == GameMode.XO)
+            options.CustomRoomPropertiesForLobby = new string[] { "gameMode", "gridSize", "winLength" };
+        else
+            options.CustomRoomPropertiesForLobby = new string[] { "gameMode" };
 
         PhotonNetwork.CreateRoom(roomId, options);
     }
@@ -166,22 +248,20 @@ public class PhotonLauncher : MonoBehaviourPunCallbacks
     public override void OnCreatedRoom()
     {
         Debug.Log("OnCreatedRoom: Room created: " + PhotonNetwork.CurrentRoom.Name);
-        if (statusText != null)
-            statusText.text = "Created room: " + PhotonNetwork.CurrentRoom.Name;
+        SetStatus("Created room: " + PhotonNetwork.CurrentRoom.Name);
         // roomIdText is updated on join to ensure server accepted
     }
 
     public override void OnCreateRoomFailed(short returnCode, string message)
     {
         Debug.LogError($"OnCreateRoomFailed: ({returnCode}) {message}");
-        if (statusText != null)
-            statusText.text = "Create failed: " + message;
+        SetStatus("Create failed: " + message);
     }
 
     public override void OnJoinedRoom()
     {
-        roomIdText.text = "Room ID: " + PhotonNetwork.CurrentRoom.Name;
-        statusText.text = "Joined room (" + PhotonNetwork.CurrentRoom.PlayerCount + "/2)";
+        SetRoomIdText("Room ID: " + PhotonNetwork.CurrentRoom.Name);
+        SetStatus("Joined room (" + PhotonNetwork.CurrentRoom.PlayerCount + "/2)");
 
         // Read room custom properties for mode and configure game manager accordingly
         if (PhotonNetwork.CurrentRoom != null && PhotonNetwork.CurrentRoom.CustomProperties != null)
@@ -189,6 +269,11 @@ public class PhotonLauncher : MonoBehaviourPunCallbacks
             var rprops = PhotonNetwork.CurrentRoom.CustomProperties;
             int gSize = selectedGridSize;
             int wLen = selectedWinLength;
+            string gmStr = selectedGameMode.ToString();
+            if (rprops.ContainsKey("gameMode"))
+            {
+                try { gmStr = (string)rprops["gameMode"]; } catch { }
+            }
             if (rprops.ContainsKey("gridSize"))
             {
                 try { gSize = System.Convert.ToInt32(rprops["gridSize"]); } catch { }
@@ -198,10 +283,19 @@ public class PhotonLauncher : MonoBehaviourPunCallbacks
                 try { wLen = System.Convert.ToInt32(rprops["winLength"]); } catch { }
             }
 
-            // Apply to XOGameManager (ensure instance exists)
-            if (XOGameManager.Instance != null)
+            // Apply to the appropriate game manager
+            if (gmStr == GameMode.XO.ToString())
             {
-                XOGameManager.Instance.ConfigureMode(gSize, wLen);
+                if (XOGameManager.Instance != null)
+                    XOGameManager.Instance.ConfigureMode(gSize, wLen);
+            }
+            else if (gmStr == GameMode.Chess.ToString())
+            {
+                // Chess configuration doesn't need gridSize/winLength; ensure manager exists
+                if (ChessGameManager.Instance != null)
+                {
+                    // ChessGameManager will be started when TryStartGame triggers start
+                }
             }
         }
 
@@ -210,29 +304,51 @@ public class PhotonLauncher : MonoBehaviourPunCallbacks
 
     public override void OnPlayerEnteredRoom(Player newPlayer)
     {
-        statusText.text = "Player joined (" + PhotonNetwork.CurrentRoom.PlayerCount + "/2)";
+        SetStatus("Player joined (" + PhotonNetwork.CurrentRoom.PlayerCount + "/2)");
         TryStartGame();
     }
 
     public override void OnJoinRoomFailed(short returnCode, string message)
     {
-        statusText.text = "Join failed: " + message;
+        SetStatus("Join failed: " + message);
     }
 
     // ================= GAME START =================
 
     void TryStartGame()
     {
-        bool forceStartLocal = XOGameManager.Instance != null && XOGameManager.Instance.localMode;
+        // Determine game mode from room props (fallback to selectedGameMode)
+        string gmStr = selectedGameMode.ToString();
+        if (PhotonNetwork.CurrentRoom != null && PhotonNetwork.CurrentRoom.CustomProperties != null && PhotonNetwork.CurrentRoom.CustomProperties.ContainsKey("gameMode"))
+        {
+            try { gmStr = (string)PhotonNetwork.CurrentRoom.CustomProperties["gameMode"]; } catch { }
+        }
+
+        bool forceStartLocal = (XOGameManager.Instance != null && XOGameManager.Instance.localMode) || false;
         if ((PhotonNetwork.CurrentRoom != null && PhotonNetwork.CurrentRoom.PlayerCount == 2) || forceStartLocal)
         {
-            lobbyPanel.SetActive(false);
-            gamePanel.SetActive(true);
-            statusText.text = forceStartLocal ? "Local Game Started!" : "Game Started!";
-            if (XOGameManager.Instance != null)
-                XOGameManager.Instance.StartGame();
+            GetLobbyPanel().SetActive(false);
+            GetGamePanel().SetActive(true);
+            SetStatus(forceStartLocal ? "Local Game Started!" : "Game Started!");
+
+            if (gmStr == GameMode.XO.ToString())
+            {
+                if (XOGameManager.Instance != null)
+                    XOGameManager.Instance.StartGame();
+                else
+                    Debug.LogWarning("XOGameManager.Instance is null when trying to start XO game.");
+            }
+            else if (gmStr == GameMode.Chess.ToString())
+            {
+                if (ChessGameManager.Instance != null)
+                    ChessGameManager.Instance.StartGame();
+                else
+                    Debug.LogWarning("ChessGameManager.Instance is null when trying to start Chess game.");
+            }
             else
-                Debug.LogWarning("XOGameManager.Instance is null when trying to start game.");
+            {
+                Debug.LogWarning("Unknown game mode when trying to start game: " + gmStr);
+            }
         }
     }
 }

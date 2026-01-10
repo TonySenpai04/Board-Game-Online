@@ -1,6 +1,8 @@
 using Photon.Pun;
+using TMPro;
 using UnityEngine;
 
+[RequireComponent(typeof(PhotonView))]
 public class ChessGameManager : MonoBehaviourPunCallbacks
 {
     public static ChessGameManager Instance;
@@ -15,53 +17,117 @@ public class ChessGameManager : MonoBehaviourPunCallbacks
     // If true, treat the board coordinates as swapped when parenting/spawning pieces.
     // Set this to true if your board's visual layout uses [y,x] ordering so pieces appear horizontal.
     public bool transposeBoard = false;
+    // If true, run in local test mode where this single client controls both sides (no network RPCs)
+    public bool localMode = false;
 
     ChessPiece selectedPiece;
     bool myTurn;
+    // UI: show turn/check status
+    public TMPro.TextMeshProUGUI statusText;
+    bool gameEnded = false;
+    // highlighted cells for the currently selected piece
+    System.Collections.Generic.List<ChessCell> highlightedCells = new System.Collections.Generic.List<ChessCell>();
 
     void Awake()
     {
         Instance = this;
+        // ensure a PhotonView exists so RPCs work
+        if (GetComponent<PhotonView>() == null)
+        {
+            Debug.LogError("ChessGameManager: PhotonView missing on this GameObject. RPCs will fail!");
+        }
     }
 
     void Start()
     {
-        CreateBoard();
-        SpawnPieces();
+        // Board may be created here in a single-player scene. Networked games call StartGame() from the launcher.
+        // Keep Start logic minimal; StartGame will be safe-guarded against double-creation.
+        myTurn = localMode ? true : PhotonNetwork.IsMasterClient; // white đi trước; localMode allows both sides
+    }
 
-        myTurn = PhotonNetwork.IsMasterClient; // white đi trước
+    // Safe start method called by PhotonLauncher when the room is ready.
+    public void StartGame()
+    {
+        if (board == null)
+        {
+            Debug.LogError("StartGame: board is null");
+            return;
+        }
+
+        // Create board cells if not already created
+        bool needCreate = false;
+        try { needCreate = board.cells[0, 0] == null; } catch { needCreate = true; }
+        if (needCreate)
+            CreateBoard();
+
+        // Spawn pieces if not already present
+        bool needSpawn = false;
+        try { needSpawn = board.pieces[0, 0] == null; } catch { needSpawn = true; }
+        if (needSpawn)
+            SpawnPieces();
+
+        myTurn = PhotonNetwork.IsMasterClient;
+        gameEnded = false;
+        // set initial status
+        if (statusText != null)
+        {
+            string init = myTurn ? "Your Turn (White)" : "Opponent Turn (White)";
+            SetStatusText(init);
+        }
+       
     }
 
     public PieceColor MyColor =>
         PhotonNetwork.IsMasterClient ? PieceColor.White : PieceColor.Black;
 
+    // Helper to access board pieces respecting transposeBoard flag
+    ChessPiece GetPieceAt(int x, int y)
+    {
+        if (board == null) return null;
+        // ALWAYS use logical coordinates for storage access
+        if (x < 0 || x >= 8 || y < 0 || y >= 8) return null;
+        return board.pieces[x, y];
+    }
+
+    void SetPieceAt(int x, int y, ChessPiece p)
+    {
+        if (board == null) return;
+        // ALWAYS use logical coordinates for storage access
+        if (x < 0 || x >= 8 || y < 0 || y >= 8) return;
+        board.pieces[x, y] = p;
+    }
+
     void CreateBoard()
     {
-        for (int x = 0; x < 8; x++)
+        // Instantiate cells row-major (y rows, x columns) so visual layout is horizontal
+        int total = 64;
+        for (int i = 0; i < total; i++)
         {
-            for (int y = 0; y < 8; y++)
-            {
-                ChessCell cell = Instantiate(cellPrefab, board.transform);
-                cell.x = x;
-                cell.y = y;
-                board.cells[x, y] = cell;
+            int x = i % 8;
+            int y = i / 8;
 
-                // assign alternating background sprite if available
-                if (lightCellSprite != null && darkCellSprite != null)
-                {
-                    Sprite s = ((x + y) % 2 == 0) ? lightCellSprite : darkCellSprite;
-                    cell.SetBackground(s);
-                }
+            ChessCell cell = Instantiate(cellPrefab, board.transform);
+            cell.x = x;
+            cell.y = y;
+            board.cells[x, y] = cell;
+
+            // assign alternating background sprite if available
+            if (lightCellSprite != null && darkCellSprite != null)
+            {
+                Sprite s = ((x + y) % 2 == 0) ? lightCellSprite : darkCellSprite;
+                cell.SetBackground(s);
             }
         }
     }
+
     void SpawnPieces()
     {
         // Pawns
         for (int x = 0; x < 8; x++)
         {
-            Spawn(PieceType.Pawn, PieceColor.White, 1, x);
-            Spawn(PieceType.Pawn, PieceColor.Black, 6, x);
+            // White pawns start at rank 6 (from top=0), black pawns at rank 1
+            Spawn(PieceType.Pawn, PieceColor.White, x, 6);
+            Spawn(PieceType.Pawn, PieceColor.Black, x, 1);
         }
 
         // Back ranks: R N B Q K B N R
@@ -78,8 +144,9 @@ public class ChessGameManager : MonoBehaviourPunCallbacks
 
         for (int x = 0; x < 8; x++)
         {
-            Spawn(backRank[x], PieceColor.White, 0, x);
-            Spawn(backRank[x], PieceColor.Black, 7, x);
+            // White back rank at 7 (bottom), black back rank at 0 (top)
+            Spawn(backRank[x], PieceColor.White, x, 7);
+            Spawn(backRank[x], PieceColor.Black, x, 0);
         }
     }
 
@@ -104,11 +171,8 @@ public class ChessGameManager : MonoBehaviourPunCallbacks
             p.SetSprite(null);
 
         // store reference on the board model
-        // store reference on the board model using the same indexing convention
-        if (!transposeBoard)
-            board.pieces[x, y] = p;
-        else
-            board.pieces[y, x] = p;
+        // ALWAYS store in logical coordinates
+        board.pieces[x, y] = p;
     }
 
     ChessCell GetCell(int x, int y)
@@ -127,24 +191,148 @@ public class ChessGameManager : MonoBehaviourPunCallbacks
     // CLICK Ô
     public void OnCellClicked(ChessCell cell)
     {
-        if (!myTurn) return;
+        // In localMode the single client controls both sides; otherwise only act on your turn
+        if (!myTurn && !localMode) return;
+        // Only attempt a move to this cell if we have a selected piece
+        if (selectedPiece == null) return;
 
-        if (selectedPiece == null)
+        ClearHighlights();
+
+        // Map visual cell coordinates back to logical coordinates
+        int targetX = cell.x;
+        int targetY = cell.y;
+
+        if (transposeBoard)
         {
-            ChessPiece p = board.pieces[cell.x, cell.y];
-            if (p != null && p.color == MyColor)
-                selectedPiece = p;
+            // If transposed, visual X is logical Y, visual Y is logical X
+            targetX = cell.y;
+            targetY = cell.x;
+        }
 
+        TryMove(selectedPiece, targetX, targetY);
+    }
+
+    // Called when a piece UI is clicked. Select/deselect or change selection.
+    public void OnPieceClicked(ChessPiece piece)
+    {
+        if (!myTurn && !localMode) return;
+        if (piece == null) return;
+
+        // Check color permission
+        bool isMyPiece = false;
+        if (localMode)
+        {
+            PieceColor turnColor = myTurn ? PieceColor.White : PieceColor.Black;
+            isMyPiece = (piece.color == turnColor);
+        }
+        else
+        {
+            isMyPiece = (piece.color == MyColor);
+        }
+
+        if (!isMyPiece)
+        {
+            // If we have a selected piece, clicking an opponent piece might be a capture attempt
+            if (selectedPiece != null)
+            {
+                // Try to capture
+                TryMove(selectedPiece, piece.x, piece.y);
+            }
             return;
         }
 
-        TryMove(selectedPiece, cell.x, cell.y);
+        // If already selected, deselect
+        if (selectedPiece == piece)
+        {
+            selectedPiece = null;
+            ClearHighlights();
+            return;
+        }
+
+        // select new piece
+        selectedPiece = piece;
+        Debug.Log($"Selected piece: {piece.type} at {piece.x},{piece.y}");
+        ClearHighlights();
+        ShowLegalMoves(selectedPiece);
+    }
+
+    void ShowLegalMoves(ChessPiece p)
+    {
+        if (p == null) return;
+        highlightedCells.Clear();
+        for (int tx = 0; tx < 8; tx++)
+        {
+            for (int ty = 0; ty < 8; ty++)
+            {
+                if (!ChessRules.IsLegalMove(p, tx, ty, board)) continue;
+
+                // simulate to ensure move doesn't leave own king in check
+                var captured = board.pieces[tx, ty];
+                int oldX = p.x, oldY = p.y;
+                board.pieces[oldX, oldY] = null;
+                board.pieces[tx, ty] = p;
+                p.x = tx; p.y = ty;
+
+                bool leavesInCheck = ChessRules.IsInCheck(board, p.color);
+
+                // undo
+                p.x = oldX; p.y = oldY;
+                board.pieces[oldX, oldY] = p;
+                board.pieces[tx, ty] = captured;
+
+                if (leavesInCheck) continue;
+
+                var cell = GetCell(tx, ty);
+                if (cell != null)
+                {
+                    cell.SetHighlight(Color.red);
+                    highlightedCells.Add(cell);
+                }
+            }
+        }
+    }
+
+    void ClearHighlights()
+    {
+        if (highlightedCells == null) return;
+        foreach (var c in highlightedCells)
+            if (c != null) c.ClearHighlight();
+        highlightedCells.Clear();
     }
 
     void TryMove(ChessPiece p, int x, int y)
     {
         if (!ChessRules.IsLegalMove(p, x, y, board))
             return;
+
+        // Prevent moves that would leave own king in check
+        var captured = board.pieces[x, y];
+        int oldX = p.x, oldY = p.y;
+        board.pieces[oldX, oldY] = null;
+        board.pieces[x, y] = p;
+        p.x = x; p.y = y;
+
+        bool leavesInCheck = ChessRules.IsInCheck(board, p.color);
+
+        // undo simulation
+        p.x = oldX; p.y = oldY;
+        board.pieces[oldX, oldY] = p;
+        board.pieces[x, y] = captured;
+
+        if (leavesInCheck) return;
+
+        if (localMode)
+        {
+            // Apply move locally for both sides (single-client testing)
+            RPC_Move(p.x, p.y, x, y);
+            return;
+        }
+
+        if (photonView == null)
+        {
+            Debug.LogError("TryMove: photonView is null. Cannot send RPC.");
+            return;
+        }
 
         photonView.RPC(
             "RPC_Move",
@@ -156,19 +344,70 @@ public class ChessGameManager : MonoBehaviourPunCallbacks
     [PunRPC]
     void RPC_Move(int fx, int fy, int tx, int ty)
     {
+        if (gameEnded) return;
+
         ChessPiece p = board.pieces[fx, fy];
         if (p == null) return;
 
+        // capture
         if (board.pieces[tx, ty] != null)
+        {
             Destroy(board.pieces[tx, ty].gameObject);
+        }
 
         board.pieces[fx, fy] = null;
         board.pieces[tx, ty] = p;
 
         p.SetPosition(tx, ty);
-        p.transform.position = board.cells[tx, ty].transform.position;
+        
+        // Update visual position
+        // GetCell handles the transposeBoard logic to find the correct visual cell
+        var targetCell = GetCell(tx, ty);
+        if (targetCell != null)
+        {
+            // Reparent to the new cell to ensure correct rendering order (on top of the cell)
+            p.transform.SetParent(targetCell.transform);
+            p.transform.localPosition = Vector3.zero;
+        }
 
-        selectedPiece = null;
-        myTurn = !myTurn;
+        // After move, determine check / checkmate
+        PieceColor mover = p.color;
+        PieceColor opponent = mover == PieceColor.White ? PieceColor.Black : PieceColor.White;
+
+        bool opponentInCheck = ChessRules.IsInCheck(board, opponent);
+        bool opponentHasMoves = ChessRules.HasAnyLegalMoves(board, opponent);
+
+        if (!opponentHasMoves && opponentInCheck)
+        {
+            // checkmate - mover wins
+            gameEnded = true;
+            SetStatusText(mover.ToString() + " wins by checkmate!");
+        }
+        else if (!opponentHasMoves && !opponentInCheck)
+        {
+            // stalemate
+            gameEnded = true;
+            SetStatusText("Stalemate");
+        }
+        else
+        {
+            // normal case: toggle turn
+            selectedPiece = null;
+            myTurn = !myTurn;
+            string turnStr = myTurn ? (MyColor == PieceColor.White ? "Your Turn (White)" : "Your Turn (Black)") : (MyColor == PieceColor.White ? "Opponent Turn (Black)" : "Opponent Turn (White)");
+            if (opponentInCheck)
+                turnStr += " - Check!";
+            SetStatusText(turnStr);
+        }
+        // clear any highlights after move
+        ClearHighlights();
+    }
+
+    void SetStatusText(string s)
+    {
+        if (statusText != null)
+            statusText.text = s;
+        else
+            Debug.Log(s);
     }
 }
