@@ -42,6 +42,7 @@ MonoBehaviour:
   - RPC_MakeMove
   - RPC_Rematch
   - RPC_Move
+  - RPC_Promote
   DisableAutoOpenWizard: 1
   ShowSettings: 0
   DevRegionSetOnce: 1

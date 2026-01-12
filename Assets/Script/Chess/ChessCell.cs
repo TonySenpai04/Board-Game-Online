@@ -8,19 +8,17 @@ public class ChessCell : MonoBehaviour
     public Button button;
     // assign this in the prefab to change square visuals
     public Image background;
+    public Image highlight;
 
-    Color originalColor = Color.white;
-    Sprite originalSprite = null;
 
     void Awake()
     {
         if (button != null)
             button.onClick.AddListener(OnClick);
 
-        if (background != null)
+        if (highlight != null)
         {
-            originalColor = background.color;
-            originalSprite = background.sprite;
+            highlight.gameObject.SetActive(false);
         }
     }
 
@@ -48,24 +46,19 @@ public class ChessCell : MonoBehaviour
     {
         if (background != null)
         {
-            originalSprite = s;
             background.sprite = s;
-            background.color = originalColor;
         }
     }
 
     public void SetHighlight(Color c)
     {
-        if (background != null)
-            background.color = c;
+        if (highlight != null)
+            highlight.gameObject.SetActive(true);
     }
 
     public void ClearHighlight()
     {
-        if (background != null)
-        {
-            background.color = originalColor;
-            background.sprite = originalSprite;
-        }
+        if (highlight != null)
+            highlight.gameObject.SetActive(false);
     }
 }

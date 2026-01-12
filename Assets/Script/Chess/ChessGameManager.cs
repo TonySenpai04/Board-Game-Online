@@ -28,6 +28,14 @@ public class ChessGameManager : MonoBehaviourPunCallbacks
     // highlighted cells for the currently selected piece
     System.Collections.Generic.List<ChessCell> highlightedCells = new System.Collections.Generic.List<ChessCell>();
 
+    [Header("Promotion UI")]
+    public ChessPromotionUI promotionUI;
+    bool waitingForPromotion = false;
+    ChessPiece pieceToPromote; // temporary storage while waiting for UI selection
+
+    // 50-move rule counter
+   [SerializeField] int halfMoveClock = 0;
+
     void Awake()
     {
         Instance = this;
@@ -193,6 +201,7 @@ public class ChessGameManager : MonoBehaviourPunCallbacks
     {
         // In localMode the single client controls both sides; otherwise only act on your turn
         if (!myTurn && !localMode) return;
+        if (waitingForPromotion) return; // Block input while promoting
         // Only attempt a move to this cell if we have a selected piece
         if (selectedPiece == null) return;
 
@@ -215,7 +224,9 @@ public class ChessGameManager : MonoBehaviourPunCallbacks
     // Called when a piece UI is clicked. Select/deselect or change selection.
     public void OnPieceClicked(ChessPiece piece)
     {
-        if (!myTurn && !localMode) return;
+        if (gameEnded) return;
+        if (!myTurn && !localMode ) return;
+        if (waitingForPromotion) return; // Block input while promoting
         if (piece == null) return;
 
         // Check color permission
@@ -349,6 +360,17 @@ public class ChessGameManager : MonoBehaviourPunCallbacks
         ChessPiece p = board.pieces[fx, fy];
         if (p == null) return;
 
+        // 50-move rule logic
+        bool isPawn = p.type == PieceType.Pawn;
+        bool isCapture = board.pieces[tx, ty] != null;
+
+        if (isPawn || isCapture)
+            halfMoveClock = 0;
+        else
+            halfMoveClock++;
+
+        Debug.Log($"HalfMoveClock: {halfMoveClock}");
+
         // capture
         if (board.pieces[tx, ty] != null)
         {
@@ -370,9 +392,46 @@ public class ChessGameManager : MonoBehaviourPunCallbacks
             p.transform.localPosition = Vector3.zero;
         }
 
+        // Check for Pawn Promotion
+        // White pawns reach y=0, Black pawns reach y=7 (logical coords)
+        // Wait, let's check the board orientation.
+        // White starts at 6, moves -1 -> reaches 0.
+        // Black starts at 1, moves +1 -> reaches 7.
+        // bool isPawn = p.type == PieceType.Pawn; // Already defined above
+        bool reachedEnd = (p.color == PieceColor.White && ty == 0) || (p.color == PieceColor.Black && ty == 7);
+
+        if (isPawn && reachedEnd)
+        {
+            // If it's my turn (or local mode), show UI
+            // Note: RPC_Move is called on all clients. We only want the owner to see the UI.
+            // But wait, RPC_Move is called AFTER the move is validated and sent.
+            // So if I am the owner of this piece, I should see the UI.
+            
+            bool isMyPiece = (localMode && ((myTurn && p.color == PieceColor.White) || (!myTurn && p.color == PieceColor.Black))) 
+                             || (!localMode && p.color == MyColor);
+
+            if (isMyPiece)
+            {
+                waitingForPromotion = true;
+                pieceToPromote = p;
+                if (promotionUI != null) promotionUI.Show();
+            }
+            
+            // Do NOT switch turn yet. Wait for promotion selection.
+            ClearHighlights();
+            return;
+        }
+
         // After move, determine check / checkmate
-        PieceColor mover = p.color;
-        PieceColor opponent = mover == PieceColor.White ? PieceColor.Black : PieceColor.White;
+        CheckGameState(p.color);
+        
+        // clear any highlights after move
+        ClearHighlights();
+    }
+
+    void CheckGameState(PieceColor moverColor)
+    {
+        PieceColor opponent = moverColor == PieceColor.White ? PieceColor.Black : PieceColor.White;
 
         bool opponentInCheck = ChessRules.IsInCheck(board, opponent);
         bool opponentHasMoves = ChessRules.HasAnyLegalMoves(board, opponent);
@@ -381,13 +440,23 @@ public class ChessGameManager : MonoBehaviourPunCallbacks
         {
             // checkmate - mover wins
             gameEnded = true;
-            SetStatusText(mover.ToString() + " wins by checkmate!");
+            SetStatusText(moverColor.ToString() + " wins by checkmate!");
         }
         else if (!opponentHasMoves && !opponentInCheck)
         {
             // stalemate
             gameEnded = true;
             SetStatusText("Stalemate");
+        }
+        else if (ChessRules.IsInsufficientMaterial(board))
+        {
+            gameEnded = true;
+            SetStatusText("Draw (Insufficient Material)");
+        }
+        else if (halfMoveClock >= 100)
+        {
+            gameEnded = true;
+            SetStatusText("Draw (50-Move Rule)");
         }
         else
         {
@@ -399,8 +468,43 @@ public class ChessGameManager : MonoBehaviourPunCallbacks
                 turnStr += " - Check!";
             SetStatusText(turnStr);
         }
-        // clear any highlights after move
-        ClearHighlights();
+    }
+
+    public void PromotePawn(PieceType newType)
+    {
+        if (!waitingForPromotion || pieceToPromote == null) return;
+
+        // Send RPC to replace piece
+        if (localMode)
+        {
+            RPC_Promote(pieceToPromote.x, pieceToPromote.y, (int)newType);
+        }
+        else
+        {
+            photonView.RPC("RPC_Promote", RpcTarget.All, pieceToPromote.x, pieceToPromote.y, (int)newType);
+        }
+
+        // Hide UI
+        if (promotionUI != null) promotionUI.Hide();
+        waitingForPromotion = false;
+        pieceToPromote = null;
+    }
+
+    [PunRPC]
+    void RPC_Promote(int x, int y, int typeInt)
+    {
+        ChessPiece p = board.pieces[x, y];
+        if (p == null) return;
+
+        PieceType newType = (PieceType)typeInt;
+        p.type = newType;
+        
+        // Update sprite
+        if (ChessSprites.Instance != null)
+            p.SetSprite(ChessSprites.Instance.GetSprite(newType, p.color));
+
+        // Now switch turn
+        CheckGameState(p.color);
     }
 
     void SetStatusText(string s)

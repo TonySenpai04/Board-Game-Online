@@ -138,10 +138,19 @@ public static class ChessRules
     {
         // Update direction: White (at 7) moves Up (-1), Black (at 0) moves Down (+1)
         int dir = p.color == PieceColor.White ? -1 : 1;
+        int startY = p.color == PieceColor.White ? 6 : 1;
 
-        // đi thẳng
+        // đi thẳng 1 ô
         if (x == p.x && y == p.y + dir && b.pieces[x, y] == null)
             return true;
+
+        // đi thẳng 2 ô (nếu ở vị trí xuất phát)
+        if (x == p.x && p.y == startY && y == p.y + 2 * dir)
+        {
+            // Phải trống cả 2 ô
+            if (b.pieces[x, p.y + dir] == null && b.pieces[x, y] == null)
+                return true;
+        }
 
         // ăn chéo
         if (Mathf.Abs(x - p.x) == 1 && y == p.y + dir)
@@ -210,5 +219,52 @@ public static class ChessRules
             cy += dy;
         }
         return true;
+    }
+    public static bool IsInsufficientMaterial(ChessBoard board)
+    {
+        int whitePieces = 0;
+        int blackPieces = 0;
+        int whiteKnights = 0;
+        int whiteBishops = 0;
+        int blackKnights = 0;
+        int blackBishops = 0;
+
+        for (int i = 0; i < 8; i++)
+        {
+            for (int j = 0; j < 8; j++)
+            {
+                var p = board.pieces[i, j];
+                if (p == null) continue;
+
+                if (p.type == PieceType.Pawn || p.type == PieceType.Rook || p.type == PieceType.Queen)
+                    return false; // Major pieces or pawns always mean sufficient material
+
+                if (p.color == PieceColor.White)
+                {
+                    whitePieces++;
+                    if (p.type == PieceType.Knight) whiteKnights++;
+                    if (p.type == PieceType.Bishop) whiteBishops++;
+                }
+                else
+                {
+                    blackPieces++;
+                    if (p.type == PieceType.Knight) blackKnights++;
+                    if (p.type == PieceType.Bishop) blackBishops++;
+                }
+            }
+        }
+
+        // King vs King
+        if (whitePieces == 1 && blackPieces == 1) return true;
+
+        // King + Knight vs King
+        if (whitePieces == 2 && whiteKnights == 1 && blackPieces == 1) return true;
+        if (blackPieces == 2 && blackKnights == 1 && whitePieces == 1) return true;
+
+        // King + Bishop vs King
+        if (whitePieces == 2 && whiteBishops == 1 && blackPieces == 1) return true;
+        if (blackPieces == 2 && blackBishops == 1 && whitePieces == 1) return true;
+
+        return false;
     }
 }
