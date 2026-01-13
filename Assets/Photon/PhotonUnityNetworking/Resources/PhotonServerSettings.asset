@@ -43,6 +43,10 @@ MonoBehaviour:
   - RPC_Rematch
   - RPC_Move
   - RPC_Promote
+  - RPC_DrawAccepted
+  - RPC_DrawDeclined
+  - RPC_OfferDraw
+  - RPC_Surrender
   DisableAutoOpenWizard: 1
   ShowSettings: 0
   DevRegionSetOnce: 1

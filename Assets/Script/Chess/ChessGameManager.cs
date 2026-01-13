@@ -514,4 +514,138 @@ public class ChessGameManager : MonoBehaviourPunCallbacks
         else
             Debug.Log(s);
     }
+
+    // =================================================================================================
+    // SURRENDER / RESIGN
+    // =================================================================================================
+
+    public void Surrender()
+    {
+        if (gameEnded) return;
+
+        // Local player surrenders
+        if (localMode)
+        {
+            // In local mode, we just say the current turn player surrendered? 
+            // Or if it's a single player testing both sides, maybe just end game.
+            // Let's assume the "current turn" player surrenders, or just White if it's ambiguous.
+            // Better: pass the color of who clicked the button. 
+            // But usually the button is for "Me".
+            // In local mode, let's just say "White" surrenders if it's White's turn, etc?
+            // Actually, let's just use MyColor logic.
+            RPC_Surrender((int)PieceColor.White); // Just for testing
+        }
+        else
+        {
+            photonView.RPC("RPC_Surrender", RpcTarget.All, (int)MyColor);
+        }
+    }
+
+    [PunRPC]
+    void RPC_Surrender(int colorInt)
+    {
+        if (gameEnded) return;
+
+        PieceColor surrenderColor = (PieceColor)colorInt;
+        gameEnded = true;
+        
+        string winner = (surrenderColor == PieceColor.White) ? "Black" : "White";
+        SetStatusText($"{surrenderColor} Surrendered. {winner} Wins!");
+    }
+
+    // =================================================================================================
+    // DRAW OFFER
+    // =================================================================================================
+
+    [Header("Draw UI")]
+    public GameObject drawOfferUI; // Assign a Panel that has "Accept" and "Decline" buttons
+
+    public void OfferDraw()
+    {
+        if (gameEnded) return;
+
+        if (localMode)
+        {
+            Debug.Log("Draw Offered (Local Mode)");
+            // In local mode, maybe just show the UI immediately to test it?
+            if (drawOfferUI != null) drawOfferUI.SetActive(true);
+        }
+        else
+        {
+            photonView.RPC("RPC_OfferDraw", RpcTarget.All, (int)MyColor);
+        }
+    }
+
+    [PunRPC]
+    void RPC_OfferDraw(int colorInt)
+    {
+        if (gameEnded) return;
+
+        PieceColor offerColor = (PieceColor)colorInt;
+        
+        // If I am NOT the one who offered, show the UI
+        if (!localMode && offerColor != MyColor)
+        {
+            if (drawOfferUI != null) drawOfferUI.SetActive(true);
+            SetStatusText($"Opponent ({offerColor}) offers a Draw.");
+        }
+        else if (localMode)
+        {
+             // Local mode testing
+             SetStatusText($"Player ({offerColor}) offers a Draw.");
+        }
+    }
+
+    public void AcceptDraw()
+    {
+        if (gameEnded) return;
+
+        // Hide UI
+        if (drawOfferUI != null) drawOfferUI.SetActive(false);
+
+        if (localMode)
+        {
+            RPC_DrawAccepted();
+        }
+        else
+        {
+            photonView.RPC("RPC_DrawAccepted", RpcTarget.All);
+        }
+    }
+
+    [PunRPC]
+    void RPC_DrawAccepted()
+    {
+        if (gameEnded) return;
+
+        gameEnded = true;
+        if (drawOfferUI != null) drawOfferUI.SetActive(false);
+        SetStatusText("Draw Agreed.");
+    }
+
+    public void DeclineDraw()
+    {
+        if (gameEnded) return;
+
+        // Hide UI
+        if (drawOfferUI != null) drawOfferUI.SetActive(false);
+
+        if (localMode)
+        {
+            RPC_DrawDeclined();
+        }
+        else
+        {
+            photonView.RPC("RPC_DrawDeclined", RpcTarget.All);
+        }
+    }
+
+    [PunRPC]
+    void RPC_DrawDeclined()
+    {
+        if (gameEnded) return; // Should not happen usually
+
+        // Just notify
+        SetStatusText("Draw Offer Declined. Game Continues.");
+    }
 }
