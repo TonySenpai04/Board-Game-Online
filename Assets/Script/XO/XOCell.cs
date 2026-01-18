@@ -10,6 +10,7 @@ public class XOCell : MonoBehaviour
     [Header("Sprites")]
     // Optional: use image sprites instead of text. If assigned, image takes precedence.
     public Image iconImage;
+    public Image backgroundImage;
     public Sprite xSprite;
     public Sprite oSprite;
 
@@ -24,10 +25,25 @@ public class XOCell : MonoBehaviour
             button.onClick.AddListener(OnClick);
         }
 
+        if (backgroundImage == null)
+            backgroundImage = GetComponent<Image>();
+
         if (iconImage == null)
-            iconImage = GetComponentInChildren<Image>();
-        // disable icon initially if present
-        if (iconImage != null)
+        {
+            // Try to find an image that is NOT the background image
+            var images = GetComponentsInChildren<Image>();
+            foreach (var img in images)
+            {
+                if (img != backgroundImage)
+                {
+                    iconImage = img;
+                    break;
+                }
+            }
+        }
+
+        // disable icon initially if present (and it's not the background!)
+        if (iconImage != null && iconImage != backgroundImage)
             iconImage.enabled = false;
     }
 
@@ -71,8 +87,9 @@ public class XOCell : MonoBehaviour
             }
         }
 
-        if (button != null)
-            button.interactable = false;
+        // Keep button interactable so it can still be clicked (visual feedback) 
+        // but logic in GameManager prevents changing the value.
+        // if (button != null) button.interactable = false;
     }
 
     public void ResetCell()

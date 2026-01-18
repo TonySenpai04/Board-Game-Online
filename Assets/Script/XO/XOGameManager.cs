@@ -325,6 +325,17 @@ public class XOGameManager : MonoBehaviourPunCallbacks
     [SerializeField] int gridSize = 3;
     [SerializeField] int winLength = 3;
     [SerializeField] public bool localMode = false;
+    [Header("Board Skin")]
+    public Sprite spriteCornerTL;
+    public Sprite spriteCornerTR;
+    public Sprite spriteCornerBL;
+    public Sprite spriteCornerBR;
+    public Sprite spriteEdgeTop;
+    public Sprite spriteEdgeBottom;
+    public Sprite spriteEdgeLeft;
+    public Sprite spriteEdgeRight;
+    public Sprite spriteCenter;
+
     [Header("References")]
     public GameObject cellPrefab; // prefab with XOCell component
     public Transform gridParent; // parent with GridLayoutGroup
@@ -383,6 +394,30 @@ public class XOGameManager : MonoBehaviourPunCallbacks
             if (cell.text == null)
                 cell.text = go.GetComponentInChildren<TextMeshProUGUI>();
             cells[i] = cell;
+
+            // Assign background sprite based on position
+            int r = i / size;
+            int c = i % size;
+            Sprite bg = spriteCenter;
+
+            // Corners
+            if (r == 0 && c == 0) bg = spriteCornerTL;
+            else if (r == 0 && c == size - 1) bg = spriteCornerTR;
+            else if (r == size - 1 && c == 0) bg = spriteCornerBL;
+            else if (r == size - 1 && c == size - 1) bg = spriteCornerBR;
+            // Edges
+            else if (r == 0) bg = spriteEdgeTop;
+            else if (r == size - 1) bg = spriteEdgeBottom;
+            else if (c == 0) bg = spriteEdgeLeft;
+            else if (c == size - 1) bg = spriteEdgeRight;
+
+            // Fallback to center if specific sprite is null (optional, but good for safety)
+            if (bg == null) bg = spriteCenter;
+
+            if (cell.backgroundImage != null)
+            {
+                cell.backgroundImage.sprite = bg;
+            }
         }
 
 

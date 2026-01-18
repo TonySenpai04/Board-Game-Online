@@ -170,6 +170,7 @@ MonoBehaviour:
   button: {fileID: 3127049947219863330}
   text: {fileID: 4246302451389590990}
   iconImage: {fileID: 5176625508093700818}
+  backgroundImage: {fileID: 2857517237561894009}
   xSprite: {fileID: -5551806152569046452, guid: 804d12f69a6be744c83fc604b7615c34, type: 3}
   oSprite: {fileID: 4894912793138166724, guid: e4540fbf533a5ca40b1fa235f446cd73, type: 3}
 --- !u!114 &3127049947219863330
