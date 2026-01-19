@@ -2,7 +2,10 @@ public class LocalGameMode : IGameMode
 {
     public bool IsMyTurn(int currentTurn) => true;
     public int MyPlayer() => 1;
-    public void SendMove(int index, int player) { }
+    public void SendMove(int index, int player) 
+    {
+        XOGameManager.Instance.ApplyMove(index, player);
+    }
 }
 public interface IGameMode
 {

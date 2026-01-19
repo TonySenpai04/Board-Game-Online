@@ -492,12 +492,17 @@ public class XOGameManager : MonoBehaviourPunCallbacks
         if (!gameMode.IsMyTurn(currentTurn)) return;
         if (!board.IsCellEmpty(index)) return;
 
+        // Delegate to GameMode to handle how the move is sent (RPC or Local)
         gameMode.SendMove(index, currentTurn);
-        photonView.RPC("RPC_MakeMove", RpcTarget.All, index, currentTurn);
     }
 
     [PunRPC]
     void RPC_MakeMove(int index, int player)
+    {
+        ApplyMove(index, player);
+    }
+
+    public void ApplyMove(int index, int player)
     {
         board.SetCell(index, player);
         cells[index].SetValue(player);
@@ -530,7 +535,7 @@ public class XOGameManager : MonoBehaviourPunCallbacks
             c.ResetCell();
 
         ui.ShowRematch(false);
-        ui.SetStatus("Your Turn");
+        ui.SetStatus(gameMode.IsMyTurn(currentTurn) ? "Your Turn" : "Opponent Turn");
     }
 
     void DrawWinLine(System.Collections.Generic.List<int> winIndices)
@@ -640,5 +645,22 @@ public class XOGameManager : MonoBehaviourPunCallbacks
 
         winLineContainer = rt;
         return rt;
+    }
+    public void LeaveRoom()
+    {
+        PhotonNetwork.LeaveRoom();
+    }
+
+    public override void OnLeftRoom()
+    {
+        // Scene loading is handled by the UI button or PhotonLauncher
+    }
+
+    public override void OnPlayerLeftRoom(Player otherPlayer)
+    {
+        if (ended) return;
+        ended = true;
+        ui.SetStatus("YOU WIN (Opponent Left)");
+        ui.ShowRematch(false); // Cannot rematch if opponent left
     }
 }

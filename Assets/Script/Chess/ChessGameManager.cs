@@ -1,4 +1,5 @@
 using Photon.Pun;
+using Photon.Realtime;
 using TMPro;
 using UnityEngine;
 
@@ -647,5 +648,20 @@ public class ChessGameManager : MonoBehaviourPunCallbacks
 
         // Just notify
         SetStatusText("Draw Offer Declined. Game Continues.");
+    }
+     public void LeaveRoom()
+    {
+        PhotonNetwork.LeaveRoom();
+    }
+
+
+
+    public override void OnPlayerLeftRoom(Player otherPlayer)
+    {
+        if (gameEnded) return;
+        gameEnded = true;
+        SetStatusText("YOU WIN (Opponent Left)");
+        if (drawOfferUI != null) drawOfferUI.SetActive(false);
+        if (promotionUI != null) promotionUI.Hide();
     }
 }
