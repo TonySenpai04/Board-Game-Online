@@ -89,6 +89,8 @@ public class ChessGameManager : MonoBehaviourPunCallbacks
     public PieceColor MyColor =>
         PhotonNetwork.IsMasterClient ? PieceColor.White : PieceColor.Black;
 
+    public bool ShouldRotateView => !localMode && MyColor == PieceColor.Black;
+
     // Helper to access board pieces respecting transposeBoard flag
     ChessPiece GetPieceAt(int x, int y)
     {
@@ -186,6 +188,13 @@ public class ChessGameManager : MonoBehaviourPunCallbacks
 
     ChessCell GetCell(int x, int y)
     {
+        // Rotate view for Black player
+        if (ShouldRotateView)
+        {
+            x = 7 - x;
+            y = 7 - y;
+        }
+
         if (!transposeBoard)
         {
             if (x < 0 || x >= 8 || y < 0 || y >= 8) return null;
@@ -217,6 +226,13 @@ public class ChessGameManager : MonoBehaviourPunCallbacks
             // If transposed, visual X is logical Y, visual Y is logical X
             targetX = cell.y;
             targetY = cell.x;
+        }
+
+        // Un-rotate view for Black player
+        if (ShouldRotateView)
+        {
+            targetX = 7 - targetX;
+            targetY = 7 - targetY;
         }
 
         TryMove(selectedPiece, targetX, targetY);

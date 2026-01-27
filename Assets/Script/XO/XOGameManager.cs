@@ -520,7 +520,8 @@ public class XOGameManager : MonoBehaviourPunCallbacks
         }
 
         currentTurn = currentTurn == 1 ? 2 : 1;
-        ui.SetStatus(gameMode.IsMyTurn(currentTurn) ? "Your Turn" : "Opponent Turn");
+        string symbol = currentTurn == 1 ? "(X)" : "(O)";
+        ui.SetStatus(gameMode.IsMyTurn(currentTurn) ? $"Your Turn {symbol}" : $"Opponent Turn {symbol}");
     }
 
     void ResetGame()
@@ -535,7 +536,8 @@ public class XOGameManager : MonoBehaviourPunCallbacks
             c.ResetCell();
 
         ui.ShowRematch(false);
-        ui.SetStatus(gameMode.IsMyTurn(currentTurn) ? "Your Turn" : "Opponent Turn");
+        string symbol = currentTurn == 1 ? "(X)" : "(O)";
+        ui.SetStatus(gameMode.IsMyTurn(currentTurn) ? $"Your Turn {symbol}" : $"Opponent Turn {symbol}");
     }
 
     void DrawWinLine(System.Collections.Generic.List<int> winIndices)

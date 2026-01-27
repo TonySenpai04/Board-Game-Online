@@ -38,6 +38,8 @@ public class PhotonLauncher : MonoBehaviourPunCallbacks
     public int selectedWinLength = 3;
 
     bool canInteract = false;
+    bool isMatching = false;
+    System.Action onConnectedAction;
 
     // Helpers to route UI between XO and Chess
     void SetStatus(string s)
@@ -102,14 +104,24 @@ public class PhotonLauncher : MonoBehaviourPunCallbacks
 
     public override void OnConnectedToMaster()
     {
-        SetStatus("Connected to Master. Joining Lobby...");
-        PhotonNetwork.JoinLobby();
+        SetStatus("Connected to Master.");
+        canInteract = true;
+        // Execute queued action if any
+        if (onConnectedAction != null)
+        {
+            var action = onConnectedAction;
+            onConnectedAction = null;
+            action.Invoke();
+        }
+        else
+        {
+            SetStatus("Connected");
+        }
     }
 
     public override void OnJoinedLobby()
     {
-        canInteract = true;
-        SetStatus("Connected ✔");
+        // Not used anymore
     }
 
     // Mode selection buttons (wire these to UI buttons)
@@ -136,7 +148,8 @@ public class PhotonLauncher : MonoBehaviourPunCallbacks
         else if (modeIndex == 1)
             selectedGameMode = GameMode.Chess;
 
-    SetStatus("Selected game: " + selectedGameMode.ToString());
+     string gameName = selectedGameMode == GameMode.XO ? "Tic Tac Toe" : selectedGameMode.ToString();
+        SetStatus("Selected game: " + gameName);
     }
 
     public void OnMode5Click()
@@ -151,12 +164,31 @@ public class PhotonLauncher : MonoBehaviourPunCallbacks
     // AUTO MATCH
     public void OnFindMatchClick()
     {
-        if (!canInteract) return;
+        if (onConnectedAction != null) return; // Already waiting for connection action
+        if (PhotonNetwork.InRoom)
+        {
+            SetRoomIdText("");
+            onConnectedAction = OnFindMatchClick;
+            PhotonNetwork.LeaveRoom();
+            return;
+        }
+        if (PhotonNetwork.NetworkClientState == ClientState.JoiningLobby || 
+            PhotonNetwork.NetworkClientState == ClientState.Joining || 
+            PhotonNetwork.NetworkClientState == ClientState.Authenticating) return;
+
+        isMatching = true;
+        if (!canInteract)
+        {
+            SetStatus("Connecting... Action queued.");
+            onConnectedAction = OnFindMatchClick;
+            return;
+        }
 
         SetStatus("Finding opponent...");
         // Join a random room that matches the selected mode (filter by gameMode and XO params)
         var expected = new Hashtable();
         expected["gameMode"] = selectedGameMode.ToString();
+        expected["isMatchmaking"] = true; // Only join rooms intended for matchmaking
         if (selectedGameMode == GameMode.XO)
         {
             expected["gridSize"] = selectedGridSize;
@@ -169,7 +201,25 @@ public class PhotonLauncher : MonoBehaviourPunCallbacks
     // CREATE ROOM (DEBUG)
     public void OnCreateRoomClick()
     {
-        if (!canInteract) return;
+        if (onConnectedAction != null) return;
+        if (PhotonNetwork.InRoom)
+        {
+            SetRoomIdText("");
+            onConnectedAction = OnCreateRoomClick;
+            PhotonNetwork.LeaveRoom();
+            return;
+        }
+        if (PhotonNetwork.NetworkClientState == ClientState.JoiningLobby || 
+            PhotonNetwork.NetworkClientState == ClientState.Joining || 
+            PhotonNetwork.NetworkClientState == ClientState.Authenticating) return;
+
+        isMatching = false;
+        if (!canInteract)
+        {
+            SetStatus("Connecting... Action queued.");
+            onConnectedAction = OnCreateRoomClick;
+            return;
+        }
 
         string roomId = Random.Range(100000, 999999).ToString();
 
@@ -183,7 +233,8 @@ public class PhotonLauncher : MonoBehaviourPunCallbacks
         // Attach selected mode to room custom properties so joins use the same board
         var props = new Hashtable
         {
-            { "gameMode", selectedGameMode.ToString() }
+            { "gameMode", selectedGameMode.ToString() },
+            { "isMatchmaking", false } // Private rooms are not for matchmaking
         };
         if (selectedGameMode == GameMode.XO)
         {
@@ -192,9 +243,9 @@ public class PhotonLauncher : MonoBehaviourPunCallbacks
         }
         options.CustomRoomProperties = props;
         if (selectedGameMode == GameMode.XO)
-            options.CustomRoomPropertiesForLobby = new string[] { "gameMode", "gridSize", "winLength" };
+            options.CustomRoomPropertiesForLobby = new string[] { "gameMode", "gridSize", "winLength", "isMatchmaking" };
         else
-            options.CustomRoomPropertiesForLobby = new string[] { "gameMode" };
+            options.CustomRoomPropertiesForLobby = new string[] { "gameMode", "isMatchmaking" };
 
         SetStatus("Creating room...");
         PhotonNetwork.CreateRoom(roomId, options);
@@ -203,7 +254,25 @@ public class PhotonLauncher : MonoBehaviourPunCallbacks
     // JOIN ROOM BY ID
     public void OnJoinRoomByIdClick()
     {
-        if (!canInteract) return;
+        if (onConnectedAction != null) return;
+        if (PhotonNetwork.InRoom)
+        {
+            SetRoomIdText("");
+            onConnectedAction = OnJoinRoomByIdClick;
+            PhotonNetwork.LeaveRoom();
+            return;
+        }
+        if (PhotonNetwork.NetworkClientState == ClientState.JoiningLobby || 
+            PhotonNetwork.NetworkClientState == ClientState.Joining || 
+            PhotonNetwork.NetworkClientState == ClientState.Authenticating) return;
+
+        isMatching = false;
+        if (!canInteract)
+        {
+            SetStatus("Connecting... Action queued.");
+            onConnectedAction = OnJoinRoomByIdClick;
+            return;
+        }
 
         string roomId = GetRoomIdInput().text.Trim();
         if (string.IsNullOrEmpty(roomId)) return;
@@ -228,7 +297,8 @@ public class PhotonLauncher : MonoBehaviourPunCallbacks
         // use currently selected mode for auto-created room
         var props = new Hashtable
         {
-            { "gameMode", selectedGameMode.ToString() }
+            { "gameMode", selectedGameMode.ToString() },
+            { "isMatchmaking", true } // Matchmaking rooms are flagged for others to find
         };
         if (selectedGameMode == GameMode.XO)
         {
@@ -237,9 +307,9 @@ public class PhotonLauncher : MonoBehaviourPunCallbacks
         }
         options.CustomRoomProperties = props;
         if (selectedGameMode == GameMode.XO)
-            options.CustomRoomPropertiesForLobby = new string[] { "gameMode", "gridSize", "winLength" };
+            options.CustomRoomPropertiesForLobby = new string[] { "gameMode", "gridSize", "winLength", "isMatchmaking" };
         else
-            options.CustomRoomPropertiesForLobby = new string[] { "gameMode" };
+            options.CustomRoomPropertiesForLobby = new string[] { "gameMode", "isMatchmaking" };
 
         PhotonNetwork.CreateRoom(roomId, options);
     }
@@ -248,7 +318,8 @@ public class PhotonLauncher : MonoBehaviourPunCallbacks
     public override void OnCreatedRoom()
     {
         Debug.Log("OnCreatedRoom: Room created: " + PhotonNetwork.CurrentRoom.Name);
-        SetStatus("Created room: " + PhotonNetwork.CurrentRoom.Name);
+        if (!isMatching)
+            SetStatus("Created room: " + PhotonNetwork.CurrentRoom.Name);
         // roomIdText is updated on join to ensure server accepted
     }
 
@@ -261,7 +332,10 @@ public class PhotonLauncher : MonoBehaviourPunCallbacks
     public override void OnJoinedRoom()
     {
         SetRoomIdText("Room ID: " + PhotonNetwork.CurrentRoom.Name);
-        SetStatus("Joined room (" + PhotonNetwork.CurrentRoom.PlayerCount + "/2)");
+        if (isMatching && PhotonNetwork.CurrentRoom.PlayerCount < 2)
+            SetStatus("Searching for opponent...");
+        else
+            SetStatus("Joined room (" + PhotonNetwork.CurrentRoom.PlayerCount + "/2)");
 
         // Read room custom properties for mode and configure game manager accordingly
         if (PhotonNetwork.CurrentRoom != null && PhotonNetwork.CurrentRoom.CustomProperties != null)
@@ -327,6 +401,7 @@ public class PhotonLauncher : MonoBehaviourPunCallbacks
         bool forceStartLocal = (XOGameManager.Instance != null && XOGameManager.Instance.localMode) || false;
         if ((PhotonNetwork.CurrentRoom != null && PhotonNetwork.CurrentRoom.PlayerCount == 2) || forceStartLocal)
         {
+            isMatching = false;
             GetLobbyPanel().SetActive(false);
             GetGamePanel().SetActive(true);
             SetStatus(forceStartLocal ? "Local Game Started!" : "Game Started!");
@@ -350,5 +425,13 @@ public class PhotonLauncher : MonoBehaviourPunCallbacks
                 Debug.LogWarning("Unknown game mode when trying to start game: " + gmStr);
             }
         }
+    }
+    public override void OnLeftRoom()
+    {
+        isMatching = false;
+        SetRoomIdText("");
+        SetStatus("Left room.");
+        // GetLobbyPanel().SetActive(true);
+        // GetGamePanel().SetActive(false);
     }
 }
