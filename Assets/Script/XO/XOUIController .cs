@@ -5,6 +5,9 @@ public class XOUIController : MonoBehaviour
 {
     public TextMeshProUGUI statusText;
     public GameObject rematchButton;
+    public GameObject winPanel;
+    public GameObject losePanel;
+    public GameObject drawPanel;
 
     public void SetStatus(string text)
     {
@@ -14,5 +17,32 @@ public class XOUIController : MonoBehaviour
     public void ShowRematch(bool show)
     {
         rematchButton.SetActive(show);
+    }
+
+    public void ShowWin()
+    {
+        if (winPanel != null) winPanel.SetActive(true);
+        if (losePanel != null) losePanel.SetActive(false);
+    }
+
+    public void ShowLose()
+    {
+        if (winPanel != null) winPanel.SetActive(false);
+        if (losePanel != null) losePanel.SetActive(true);
+        if (drawPanel != null) drawPanel.SetActive(false);
+    }
+
+    public void ShowDraw()
+    {
+        if (winPanel != null) winPanel.SetActive(false);
+        if (losePanel != null) losePanel.SetActive(false);
+        if (drawPanel != null) drawPanel.SetActive(true);
+    }
+
+    public void HideEndPanels()
+    {
+        if (winPanel != null) winPanel.SetActive(false);
+        if (losePanel != null) losePanel.SetActive(false);
+        if (drawPanel != null) drawPanel.SetActive(false);
     }
 }

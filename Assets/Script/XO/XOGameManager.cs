@@ -510,12 +510,34 @@ public class XOGameManager : MonoBehaviourPunCallbacks
         if (winChecker.CheckWin(board, player))
         {
             ended = true;
-            ui.SetStatus(player == gameMode.MyPlayer() ? "YOU WIN" : "YOU LOSE");
+            bool isWin = player == gameMode.MyPlayer();
+            ui.SetStatus(isWin ? "YOU WIN" : "YOU LOSE");
             ui.ShowRematch(true);
+            
+            if (isWin)
+            {
+                ui.ShowWin();
+                if (SoundManager.Instance != null) SoundManager.Instance.PlayWin();
+            }
+            else
+            {
+                ui.ShowLose();
+                if (SoundManager.Instance != null) SoundManager.Instance.PlayLose();
+            }
             // draw animated win line between first and last winning cells
             var winIndices = WinLineFinder.GetWinningLine(board, player, winLength);
             if (winIndices != null && winIndices.Count > 0)
                 DrawWinLine(winIndices);
+            return;
+        }
+
+        if (board.IsFull())
+        {
+            ended = true;
+            ui.SetStatus("DRAW");
+            ui.ShowRematch(true);
+            ui.ShowDraw();
+            if (SoundManager.Instance != null) SoundManager.Instance.PlayDraw();
             return;
         }
 
@@ -536,6 +558,7 @@ public class XOGameManager : MonoBehaviourPunCallbacks
             c.ResetCell();
 
         ui.ShowRematch(false);
+        ui.HideEndPanels();
         string symbol = currentTurn == 1 ? "(X)" : "(O)";
         ui.SetStatus(gameMode.IsMyTurn(currentTurn) ? $"Your Turn {symbol}" : $"Opponent Turn {symbol}");
     }
@@ -664,5 +687,7 @@ public class XOGameManager : MonoBehaviourPunCallbacks
         ended = true;
         ui.SetStatus("YOU WIN (Opponent Left)");
         ui.ShowRematch(false); // Cannot rematch if opponent left
+        ui.ShowWin();
+        if (SoundManager.Instance != null) SoundManager.Instance.PlayWin();
     }
 }

@@ -16,6 +16,13 @@
         Data[index] = player;
     }
 
+    public bool IsFull()
+    {
+        foreach (var val in Data)
+            if (val == 0) return false;
+        return true;
+    }
+
     public void Reset()
     {
         for (int i = 0; i < Data.Length; i++)

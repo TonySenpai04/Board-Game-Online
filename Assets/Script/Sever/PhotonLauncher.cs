@@ -12,6 +12,10 @@ public class PhotonLauncher : MonoBehaviourPunCallbacks
     public GameObject lobbyPanel;
     public GameObject gamePanel;
 
+    [Header("Roots")]
+    public GameObject xoRoot;
+    public GameObject chessRoot;
+
     [Header("UI XO")]
     public TextMeshProUGUI statusText;
     public TextMeshProUGUI roomIdText;
@@ -150,6 +154,9 @@ public class PhotonLauncher : MonoBehaviourPunCallbacks
 
      string gameName = selectedGameMode == GameMode.XO ? "Tic Tac Toe" : selectedGameMode.ToString();
         SetStatus("Selected game: " + gameName);
+
+        if (xoRoot != null) xoRoot.SetActive(selectedGameMode == GameMode.XO);
+        if (chessRoot != null) chessRoot.SetActive(selectedGameMode == GameMode.Chess);
     }
 
     public void OnMode5Click()
@@ -360,15 +367,16 @@ public class PhotonLauncher : MonoBehaviourPunCallbacks
             // Apply to the appropriate game manager
             if (gmStr == GameMode.XO.ToString())
             {
+                selectedGameMode = GameMode.XO;
                 if (XOGameManager.Instance != null)
                     XOGameManager.Instance.ConfigureMode(gSize, wLen);
             }
             else if (gmStr == GameMode.Chess.ToString())
             {
-                // Chess configuration doesn't need gridSize/winLength; ensure manager exists
+                selectedGameMode = GameMode.Chess;
+                // ChessGameManager will be started when TryStartGame triggers start
                 if (ChessGameManager.Instance != null)
                 {
-                    // ChessGameManager will be started when TryStartGame triggers start
                 }
             }
         }
@@ -431,7 +439,26 @@ public class PhotonLauncher : MonoBehaviourPunCallbacks
         isMatching = false;
         SetRoomIdText("");
         SetStatus("Left room.");
-        // GetLobbyPanel().SetActive(true);
-        // GetGamePanel().SetActive(false);
+
+        // Only toggle panels for the active game root
+        if (xoRoot != null && xoRoot.activeInHierarchy)
+        {
+            if (lobbyPanel != null) lobbyPanel.SetActive(true);
+            if (gamePanel != null) gamePanel.SetActive(false);
+        }
+        else if (chessRoot != null && chessRoot.activeInHierarchy)
+        {
+            if (lobbyPanelChess != null) lobbyPanelChess.SetActive(true);
+            if (gamePanelChess != null) gamePanelChess.SetActive(false);
+        }
+    }
+
+    // New function to exit back to mode selection
+    public void OnExitToModeSelection()
+    {
+        if (PhotonNetwork.InRoom)
+        {
+            PhotonNetwork.LeaveRoom();
+        }
     }
 }

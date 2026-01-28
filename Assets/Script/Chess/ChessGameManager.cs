@@ -37,6 +37,11 @@ public class ChessGameManager : MonoBehaviourPunCallbacks
     // 50-move rule counter
    [SerializeField] int halfMoveClock = 0;
 
+    [Header("End Game Panels")]
+    public GameObject winPanel;
+    public GameObject losePanel;
+    public GameObject drawPanel;
+
     void Awake()
     {
         Instance = this;
@@ -69,21 +74,34 @@ public class ChessGameManager : MonoBehaviourPunCallbacks
         if (needCreate)
             CreateBoard();
 
+        // Reset game state
+        gameEnded = false;
+        halfMoveClock = 0;
+        waitingForPromotion = false;
+        pieceToPromote = null;
+        selectedPiece = null;
+
+        // Hide UI panels
+        if (winPanel != null) winPanel.SetActive(false);
+        if (losePanel != null) losePanel.SetActive(false);
+        if (drawPanel != null) drawPanel.SetActive(false);
+        if (drawOfferUI != null) drawOfferUI.SetActive(false);
+        if (promotionUI != null) promotionUI.Hide();
+
+        // Clear existing board pieces
+        ClearBoard();
+
         // Spawn pieces if not already present
-        bool needSpawn = false;
-        try { needSpawn = board.pieces[0, 0] == null; } catch { needSpawn = true; }
-        if (needSpawn)
-            SpawnPieces();
+        SpawnPieces();
 
         myTurn = PhotonNetwork.IsMasterClient;
-        gameEnded = false;
+
         // set initial status
         if (statusText != null)
         {
             string init = myTurn ? "Your Turn (White)" : "Opponent Turn (White)";
             SetStatusText(init);
         }
-       
     }
 
     public PieceColor MyColor =>
@@ -127,6 +145,22 @@ public class ChessGameManager : MonoBehaviourPunCallbacks
             {
                 Sprite s = ((x + y) % 2 == 0) ? lightCellSprite : darkCellSprite;
                 cell.SetBackground(s);
+            }
+        }
+    }
+
+    void ClearBoard()
+    {
+        if (board == null) return;
+        for (int x = 0; x < 8; x++)
+        {
+            for (int y = 0; y < 8; y++)
+            {
+                if (board.pieces[x, y] != null)
+                {
+                    Destroy(board.pieces[x, y].gameObject);
+                    board.pieces[x, y] = null;
+                }
             }
         }
     }
@@ -374,6 +408,9 @@ public class ChessGameManager : MonoBehaviourPunCallbacks
     {
         if (gameEnded) return;
 
+        if (SoundManager.Instance != null)
+            SoundManager.Instance.PlayChessMove();
+
         ChessPiece p = board.pieces[fx, fy];
         if (p == null) return;
 
@@ -411,19 +448,10 @@ public class ChessGameManager : MonoBehaviourPunCallbacks
 
         // Check for Pawn Promotion
         // White pawns reach y=0, Black pawns reach y=7 (logical coords)
-        // Wait, let's check the board orientation.
-        // White starts at 6, moves -1 -> reaches 0.
-        // Black starts at 1, moves +1 -> reaches 7.
-        // bool isPawn = p.type == PieceType.Pawn; // Already defined above
         bool reachedEnd = (p.color == PieceColor.White && ty == 0) || (p.color == PieceColor.Black && ty == 7);
 
         if (isPawn && reachedEnd)
         {
-            // If it's my turn (or local mode), show UI
-            // Note: RPC_Move is called on all clients. We only want the owner to see the UI.
-            // But wait, RPC_Move is called AFTER the move is validated and sent.
-            // So if I am the owner of this piece, I should see the UI.
-            
             bool isMyPiece = (localMode && ((myTurn && p.color == PieceColor.White) || (!myTurn && p.color == PieceColor.Black))) 
                              || (!localMode && p.color == MyColor);
 
@@ -434,7 +462,6 @@ public class ChessGameManager : MonoBehaviourPunCallbacks
                 if (promotionUI != null) promotionUI.Show();
             }
             
-            // Do NOT switch turn yet. Wait for promotion selection.
             ClearHighlights();
             return;
         }
@@ -458,22 +485,40 @@ public class ChessGameManager : MonoBehaviourPunCallbacks
             // checkmate - mover wins
             gameEnded = true;
             SetStatusText(moverColor.ToString() + " wins by checkmate!");
+
+            bool isWin = moverColor == MyColor;
+            if (isWin)
+            {
+                if (winPanel != null) winPanel.SetActive(true);
+                if (SoundManager.Instance != null) SoundManager.Instance.PlayWin();
+            }
+            else
+            {
+                if (losePanel != null) losePanel.SetActive(true);
+                if (SoundManager.Instance != null) SoundManager.Instance.PlayLose();
+            }
         }
         else if (!opponentHasMoves && !opponentInCheck)
         {
             // stalemate
             gameEnded = true;
             SetStatusText("Stalemate");
+            if (drawPanel != null) drawPanel.SetActive(true);
+            if (SoundManager.Instance != null) SoundManager.Instance.PlayDraw();
         }
         else if (ChessRules.IsInsufficientMaterial(board))
         {
             gameEnded = true;
             SetStatusText("Draw (Insufficient Material)");
+            if (drawPanel != null) drawPanel.SetActive(true);
+            if (SoundManager.Instance != null) SoundManager.Instance.PlayDraw();
         }
         else if (halfMoveClock >= 100)
         {
             gameEnded = true;
             SetStatusText("Draw (50-Move Rule)");
+            if (drawPanel != null) drawPanel.SetActive(true);
+            if (SoundManager.Instance != null) SoundManager.Instance.PlayDraw();
         }
         else
         {
@@ -543,14 +588,9 @@ public class ChessGameManager : MonoBehaviourPunCallbacks
         // Local player surrenders
         if (localMode)
         {
-            // In local mode, we just say the current turn player surrendered? 
-            // Or if it's a single player testing both sides, maybe just end game.
-            // Let's assume the "current turn" player surrenders, or just White if it's ambiguous.
-            // Better: pass the color of who clicked the button. 
-            // But usually the button is for "Me".
-            // In local mode, let's just say "White" surrenders if it's White's turn, etc?
-            // Actually, let's just use MyColor logic.
-            RPC_Surrender((int)PieceColor.White); // Just for testing
+            // In local mode, the current turn player surrenders
+            PieceColor surrenderColor = myTurn ? PieceColor.White : PieceColor.Black;
+            RPC_Surrender((int)surrenderColor);
         }
         else
         {
@@ -568,6 +608,29 @@ public class ChessGameManager : MonoBehaviourPunCallbacks
         
         string winner = (surrenderColor == PieceColor.White) ? "Black" : "White";
         SetStatusText($"{surrenderColor} Surrendered. {winner} Wins!");
+
+        // Show win/loss panels
+        bool isWin = false;
+        if (localMode)
+        {
+            // In local mode, we just show win for the winner
+            isWin = (surrenderColor != (myTurn ? PieceColor.White : PieceColor.Black));
+        }
+        else
+        {
+            isWin = (surrenderColor != MyColor);
+        }
+
+        if (isWin)
+        {
+            if (winPanel != null) winPanel.SetActive(true);
+            if (SoundManager.Instance != null) SoundManager.Instance.PlayWin();
+        }
+        else
+        {
+            if (losePanel != null) losePanel.SetActive(true);
+            if (SoundManager.Instance != null) SoundManager.Instance.PlayLose();
+        }
     }
 
     // =================================================================================================
@@ -637,6 +700,8 @@ public class ChessGameManager : MonoBehaviourPunCallbacks
 
         gameEnded = true;
         if (drawOfferUI != null) drawOfferUI.SetActive(false);
+        if (drawPanel != null) drawPanel.SetActive(true);
+        if (SoundManager.Instance != null) SoundManager.Instance.PlayDraw();
         SetStatusText("Draw Agreed.");
     }
 
@@ -679,5 +744,7 @@ public class ChessGameManager : MonoBehaviourPunCallbacks
         SetStatusText("YOU WIN (Opponent Left)");
         if (drawOfferUI != null) drawOfferUI.SetActive(false);
         if (promotionUI != null) promotionUI.Hide();
+        if (winPanel != null) winPanel.SetActive(true);
+        if (SoundManager.Instance != null) SoundManager.Instance.PlayWin();
     }
 }

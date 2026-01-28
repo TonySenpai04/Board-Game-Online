@@ -49,6 +49,9 @@ public class XOCell : MonoBehaviour
 
     public void OnClick()
     {
+        if (SoundManager.Instance != null)
+            SoundManager.Instance.PlayXOClick();
+
         if (XOGameManager.Instance != null)
             XOGameManager.Instance.MakeMove(index);
     }
