@@ -739,7 +739,17 @@ public class ChessGameManager : MonoBehaviourPunCallbacks
 
     public override void OnPlayerLeftRoom(Player otherPlayer)
     {
+        // If the game has already ended naturally, don't override the result
         if (gameEnded) return;
+
+        // Extra safety: check if any end-game panel is already active
+        if ((winPanel != null && winPanel.activeSelf) || 
+            (losePanel != null && losePanel.activeSelf) || 
+            (drawPanel != null && drawPanel.activeSelf))
+        {
+            return;
+        }
+
         gameEnded = true;
         SetStatusText("YOU WIN (Opponent Left)");
         if (drawOfferUI != null) drawOfferUI.SetActive(false);

@@ -680,7 +680,17 @@ public class XOGameManager : MonoBehaviourPunCallbacks
 
     public override void OnPlayerLeftRoom(Player otherPlayer)
     {
+        // If the game has already ended naturally, don't override the result
         if (ended) return;
+        
+        // Extra safety: check if any end-game panel is already active
+        if (ui != null && ((ui.winPanel != null && ui.winPanel.activeSelf) || 
+                           (ui.losePanel != null && ui.losePanel.activeSelf) || 
+                           (ui.drawPanel != null && ui.drawPanel.activeSelf)))
+        {
+            return;
+        }
+
         ended = true;
         ui.SetStatus("YOU WIN (Opponent Left)");
         ui.ShowWin();
