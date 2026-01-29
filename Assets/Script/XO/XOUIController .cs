@@ -4,7 +4,6 @@ using UnityEngine;
 public class XOUIController : MonoBehaviour
 {
     public TextMeshProUGUI statusText;
-    public GameObject rematchButton;
     public GameObject winPanel;
     public GameObject losePanel;
     public GameObject drawPanel;
@@ -12,11 +11,6 @@ public class XOUIController : MonoBehaviour
     public void SetStatus(string text)
     {
         statusText.text = text;
-    }
-
-    public void ShowRematch(bool show)
-    {
-        rematchButton.SetActive(show);
     }
 
     public void ShowWin()

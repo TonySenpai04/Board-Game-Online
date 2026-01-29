@@ -96,8 +96,6 @@ public class PhotonLauncher : MonoBehaviourPunCallbacks
     void Start()
     {
         
-
-    SetStatus("Connecting to Photon...");
         PhotonNetwork.AutomaticallySyncScene = false;
         PhotonNetwork.LogLevel = PunLogLevel.Full;
 
@@ -108,7 +106,7 @@ public class PhotonLauncher : MonoBehaviourPunCallbacks
 
     public override void OnConnectedToMaster()
     {
-        SetStatus("Connected to Master.");
+
         canInteract = true;
         // Execute queued action if any
         if (onConnectedAction != null)
@@ -119,7 +117,7 @@ public class PhotonLauncher : MonoBehaviourPunCallbacks
         }
         else
         {
-            SetStatus("Connected");
+           
         }
     }
 
@@ -153,7 +151,7 @@ public class PhotonLauncher : MonoBehaviourPunCallbacks
             selectedGameMode = GameMode.Chess;
 
      string gameName = selectedGameMode == GameMode.XO ? "Tic Tac Toe" : selectedGameMode.ToString();
-        SetStatus("Selected game: " + gameName);
+        SetStatus( gameName);
 
         if (xoRoot != null) xoRoot.SetActive(selectedGameMode == GameMode.XO);
         if (chessRoot != null) chessRoot.SetActive(selectedGameMode == GameMode.Chess);
@@ -186,7 +184,7 @@ public class PhotonLauncher : MonoBehaviourPunCallbacks
         isMatching = true;
         if (!canInteract)
         {
-            SetStatus("Connecting... Action queued.");
+ 
             onConnectedAction = OnFindMatchClick;
             return;
         }
@@ -223,7 +221,6 @@ public class PhotonLauncher : MonoBehaviourPunCallbacks
         isMatching = false;
         if (!canInteract)
         {
-            SetStatus("Connecting... Action queued.");
             onConnectedAction = OnCreateRoomClick;
             return;
         }
@@ -276,7 +273,6 @@ public class PhotonLauncher : MonoBehaviourPunCallbacks
         isMatching = false;
         if (!canInteract)
         {
-            SetStatus("Connecting... Action queued.");
             onConnectedAction = OnJoinRoomByIdClick;
             return;
         }

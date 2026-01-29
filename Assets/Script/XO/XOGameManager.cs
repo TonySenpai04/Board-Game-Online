@@ -512,7 +512,6 @@ public class XOGameManager : MonoBehaviourPunCallbacks
             ended = true;
             bool isWin = player == gameMode.MyPlayer();
             ui.SetStatus(isWin ? "YOU WIN" : "YOU LOSE");
-            ui.ShowRematch(true);
             
             if (isWin)
             {
@@ -535,7 +534,6 @@ public class XOGameManager : MonoBehaviourPunCallbacks
         {
             ended = true;
             ui.SetStatus("DRAW");
-            ui.ShowRematch(true);
             ui.ShowDraw();
             if (SoundManager.Instance != null) SoundManager.Instance.PlayDraw();
             return;
@@ -557,7 +555,6 @@ public class XOGameManager : MonoBehaviourPunCallbacks
         foreach (var c in cells)
             c.ResetCell();
 
-        ui.ShowRematch(false);
         ui.HideEndPanels();
         string symbol = currentTurn == 1 ? "(X)" : "(O)";
         ui.SetStatus(gameMode.IsMyTurn(currentTurn) ? $"Your Turn {symbol}" : $"Opponent Turn {symbol}");
@@ -686,7 +683,6 @@ public class XOGameManager : MonoBehaviourPunCallbacks
         if (ended) return;
         ended = true;
         ui.SetStatus("YOU WIN (Opponent Left)");
-        ui.ShowRematch(false); // Cannot rematch if opponent left
         ui.ShowWin();
         if (SoundManager.Instance != null) SoundManager.Instance.PlayWin();
     }
