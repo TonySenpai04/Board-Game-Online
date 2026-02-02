@@ -189,7 +189,8 @@ public class PhotonLauncher : MonoBehaviourPunCallbacks
             return;
         }
 
-        SetStatus("Finding opponent...");
+        SetStatus("");
+        SetRoomIdText("Finding opponent...");
         // Join a random room that matches the selected mode (filter by gameMode and XO params)
         var expected = new Hashtable();
         expected["gameMode"] = selectedGameMode.ToString();
@@ -334,11 +335,16 @@ public class PhotonLauncher : MonoBehaviourPunCallbacks
 
     public override void OnJoinedRoom()
     {
-        SetRoomIdText("Room ID: " + PhotonNetwork.CurrentRoom.Name);
         if (isMatching && PhotonNetwork.CurrentRoom.PlayerCount < 2)
-            SetStatus("Searching for opponent...");
+        {
+            SetRoomIdText("Finding opponent...");
+            SetStatus("");
+        }
         else
+        {
+            SetRoomIdText("Room ID: " + PhotonNetwork.CurrentRoom.Name);
             SetStatus("Joined room (" + PhotonNetwork.CurrentRoom.PlayerCount + "/2)");
+        }
 
         // Read room custom properties for mode and configure game manager accordingly
         if (PhotonNetwork.CurrentRoom != null && PhotonNetwork.CurrentRoom.CustomProperties != null)
