@@ -80,6 +80,7 @@ public class ChessGameManager : MonoBehaviourPunCallbacks
         waitingForPromotion = false;
         pieceToPromote = null;
         selectedPiece = null;
+        ClearHighlights();
 
         // Hide UI panels
         if (winPanel != null) winPanel.SetActive(false);
@@ -152,15 +153,30 @@ public class ChessGameManager : MonoBehaviourPunCallbacks
     void ClearBoard()
     {
         if (board == null) return;
+
+        // More robust: clear children of all cells to ensure no orphaned pieces
+        if (board.cells != null)
+        {
+            foreach (var cell in board.cells)
+            {
+                if (cell == null) continue;
+                // Destroy all objects that have ChessPiece component under this cell
+                foreach (Transform child in cell.transform)
+                {
+                    if (child.GetComponent<ChessPiece>() != null)
+                    {
+                        Destroy(child.gameObject);
+                    }
+                }
+            }
+        }
+
+        // Also clear array references
         for (int x = 0; x < 8; x++)
         {
             for (int y = 0; y < 8; y++)
             {
-                if (board.pieces[x, y] != null)
-                {
-                    Destroy(board.pieces[x, y].gameObject);
-                    board.pieces[x, y] = null;
-                }
+                board.pieces[x, y] = null;
             }
         }
     }

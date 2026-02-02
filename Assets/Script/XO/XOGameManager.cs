@@ -682,7 +682,6 @@ public class XOGameManager : MonoBehaviourPunCallbacks
     {
         // If the game has already ended naturally, don't override the result
         if (ended) return;
-        
         // Extra safety: check if any end-game panel is already active
         if (ui != null && ((ui.winPanel != null && ui.winPanel.activeSelf) || 
                            (ui.losePanel != null && ui.losePanel.activeSelf) || 
